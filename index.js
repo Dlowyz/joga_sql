@@ -46,17 +46,64 @@ app.get('/', (req, res) => {
 
 // Show article by this slug
 app.get('/article/:slug', (req, res) => {
-    let query = `SELECT * FROM article WHERE slug='${req.params.slug}'`;
-    let article;
-    con.query(query, (err, result) => {
+    let query = `
+        SELECT article.*, author.name AS author_name 
+        FROM article 
+        JOIN author ON article.author_id = author.id 
+        WHERE article.slug = ?
+    `;
+    con.query(query, [req.params.slug], (err, result) => {
         if (err) throw err;
-        article = result[0];
+        let article = result[0];
         console.log(article);
-        res.render('article', {
-            article: article
+        res.render('article', { article: article });
+    });
+});
+
+// Show all articles by a specific author
+app.get('/author/:author_id', (req, res) => {
+    let authorId = req.params.author_id;
+
+    // Query to get the author's name
+    let authorQuery = "SELECT name FROM author WHERE id = ?";
+    // Query to get all articles by the author
+    let articlesQuery = "SELECT * FROM article WHERE author_id = ?";
+
+    con.query(authorQuery, [authorId], (err, authorResult) => {
+        if (err) throw err;
+
+        // Get the author's name
+        let authorName = authorResult[0].name;
+
+        // Now fetch the articles written by this author
+        con.query(articlesQuery, [authorId], (err, articlesResult) => {
+            if (err) throw err;
+
+            // Render the 'author' template with both author name and articles
+            res.render('author', {
+                author_name: authorName,
+                articles: articlesResult
+            });
         });
     });
 });
+const articleRouter = require('./routes/article');
+const authorRouter = require('./routes/author'); // Import the author router
+
+// Middleware and other configurations
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Route handling
+app.use('/', articleRouter);          // Existing article routes
+app.use('/author', authorRouter);      // New author routes
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+});
+
 
 app.listen(3003, () => {
     console.log('App is started at http://localhost:3003')
